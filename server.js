@@ -6,13 +6,14 @@ const fetch = require("node-fetch");
 
 // --- Inicialización de la App Express ---
 const app = express();
-app.use(express.json()); // Middleware para parsear el cuerpo de las peticiones como JSON
+app.use(express.json());
 
 // --- Variables de Entorno ---
 const MESSENGER_ACCESS_TOKEN = process.env.MESSENGER_ACCESS_TOKEN;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY; // Nueva variable para la clave de Gemini
 
-// --- Ruta Principal (para verificar que el servidor está funcionando) ---
+// --- Ruta Principal ---
 app.get("/", (req, res) => {
   res.send("¡El servidor del bot de Instagram está en línea!");
 });
@@ -20,7 +21,6 @@ app.get("/", (req, res) => {
 // --- RUTA DE VERIFICACIÓN DEL WEBHOOK (GET) ---
 app.get("/webhook", (req, res) => {
   console.log("Recibida petición de verificación de webhook...");
-
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
@@ -43,7 +43,6 @@ app.post("/webhook", async (req, res) => {
   const body = req.body;
   console.log("Recibido evento de webhook:", JSON.stringify(body, null, 2));
 
-  // CORRECCIÓN: Verificamos que el objeto sea "instagram" o "page"
   if (body.object === "instagram" || body.object === "page") {
     for (const entry of body.entry) {
       for (const event of entry.messaging) {
@@ -65,15 +64,14 @@ app.post("/webhook", async (req, res) => {
     }
     res.status(200).send("EVENT_RECEIVED");
   } else {
-    // Si el evento no es de los esperados, lo ignoramos
     res.sendStatus(404);
   }
 });
 
 // --- FUNCIÓN PARA OBTENER RESPUESTA DE GEMINI ---
 async function getGeminiResponse(prompt) {
-  const apiKey = ""; // No se necesita clave en este entorno
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  // Usamos la clave de API desde las variables de entorno
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
   const payload = {
     contents: [{
       role: "user",
@@ -91,7 +89,11 @@ async function getGeminiResponse(prompt) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!response.ok) throw new Error(`Error de API de Gemini: ${response.status}`);
+    if (!response.ok) {
+        const errorBody = await response.json();
+        console.error("Error de la API de Gemini:", errorBody);
+        throw new Error(`Error de API de Gemini: ${response.status}`);
+    }
     const result = await response.json();
     return result.candidates[0].content.parts[0].text;
   } catch (error) {
@@ -125,3 +127,4 @@ async function sendInstagramMessage(recipientId, text) {
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log("Tu app está escuchando en el puerto " + listener.address().port);
 });
+
