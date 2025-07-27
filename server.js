@@ -9,7 +9,6 @@ const app = express();
 app.use(express.json()); // Middleware para parsear el cuerpo de las peticiones como JSON
 
 // --- Variables de Entorno ---
-// Guardamos los tokens secretos en las variables de entorno de Render
 const MESSENGER_ACCESS_TOKEN = process.env.MESSENGER_ACCESS_TOKEN;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 
@@ -19,7 +18,6 @@ app.get("/", (req, res) => {
 });
 
 // --- RUTA DE VERIFICACIÓN DEL WEBHOOK (GET) ---
-// Meta usará esta ruta para verificar que la URL que le proporcionaste es válida.
 app.get("/webhook", (req, res) => {
   console.log("Recibida petición de verificación de webhook...");
 
@@ -41,12 +39,12 @@ app.get("/webhook", (req, res) => {
 });
 
 // --- RUTA DE EVENTOS DEL WEBHOOK (POST) ---
-// Aquí es donde Meta nos enviará los eventos, como los mensajes de los usuarios.
 app.post("/webhook", async (req, res) => {
   const body = req.body;
   console.log("Recibido evento de webhook:", JSON.stringify(body, null, 2));
 
-  if (body.object === "instagram") {
+  // CORRECCIÓN: Verificamos que el objeto sea "instagram" o "page"
+  if (body.object === "instagram" || body.object === "page") {
     for (const entry of body.entry) {
       for (const event of entry.messaging) {
         if (event.message && event.message.text) {
@@ -67,6 +65,7 @@ app.post("/webhook", async (req, res) => {
     }
     res.status(200).send("EVENT_RECEIVED");
   } else {
+    // Si el evento no es de los esperados, lo ignoramos
     res.sendStatus(404);
   }
 });
